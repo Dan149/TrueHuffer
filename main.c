@@ -1,5 +1,4 @@
-
-
+#include "src/compress.h"
 
 int main()
 {
