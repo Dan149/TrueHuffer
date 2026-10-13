@@ -1,6 +1,9 @@
 # TrueHuffer
 TrueHuffer, programme de compression de fichiers basé sur la méthode Huffman.
 
+[![Dan149 Commits](https://img.shields.io/badge/Dan149_Commits-Ici-blue?logo=github)](https://github.com/Dan149/TrueHuffer/commits?author=Dan149)
+[![JustYanyan Commits](https://img.shields.io/badge/JustYanyan_Commits-Ici-green?logo=github)](https://github.com/Dan149/TrueHuffer/commits?author=JustYanyan)
+
 ## Remarques pour Mme Sabahi
 Nous avons décidé de commenter le code en anglais durant le développement. Si cela change pour la version finale, ne soyez pas étonnée de trouver des explications en anglais dans les commits précédents de ma part pour Yanis et inversement.
 De la même manière, le nom des variables & fonctions est en anglais.
