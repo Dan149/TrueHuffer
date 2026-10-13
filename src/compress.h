@@ -8,7 +8,9 @@ TextObject *initTextObject(char * dc, char * ic); // dc and ic should be optiona
 // BinaryTree & Nodes
 typedef struct BinaryTree BinaryTree;
 typedef struct Node Node;
+typedef struct FrequencyTable FrequencyTable;
 int appendNode(Node * node_list, Node new_node); // 0: OK | -1: Err | realloc() the node_list, add new child node.
+FrequencyTable * get_char_freq(char * str);
 
 //
 int inflate(TextObject *obj); // Make it big.

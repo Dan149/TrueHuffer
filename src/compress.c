@@ -1,8 +1,8 @@
 // std
 #include <stdlib.h>
-#include <stdio.h>
 #include <assert.h> // YANIS. Learn ts please.
 #include <string.h> // YANIS. Also, check docs for this.
+#include <sys/types.h>
 // src
 #include "compress.h"
 
@@ -21,11 +21,32 @@ struct BinaryTree {
 };
 
 struct Node {
-  char val; // single letter value.
+  char letter; // single letter value.
+  u_int freq;  
   Node *children; // children letters.
 };
 
+struct FrequencyTable {
+  char * key;
+  uint * freq;
+};
+
 ////////////
+
+
+FrequencyTable * get_char_freq_table(char * str) {
+  FrequencyTable *ft;
+  ft = malloc(sizeof(FrequencyTable));
+  ft->key = malloc(strlen(str)*sizeof(char));
+  ft->freq = calloc(strlen(str), sizeof(uint));
+  // TODO: Handle malloc errors.
+
+  for (int i = 0; i < strlen(str); i++) {
+    // DICTS OR NOT ?????
+    
+  }
+  return ft;
+}
 
 
 TextObject *initTextObject(char * dc, char * ic) {
