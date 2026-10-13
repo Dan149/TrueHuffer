@@ -1,3 +1,5 @@
+#ifndef COMPRESS_H
+#define COMPRESS_H
 
 // TextObject implementation:
 typedef struct TextObject TextObject;
@@ -11,3 +13,5 @@ int appendNode(Node * node_list, Node new_node); // 0: OK | -1: Err | realloc() 
 //
 int inflate(TextObject *obj); // Make it big.
 int deflate(TextObject *obj); // Make it smol.
+
+#endif //COMPRESS_H
