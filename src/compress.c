@@ -56,7 +56,17 @@ FrequencyTable * get_char_freq_table(char * s) {
       ft->freq[cur_len] = 1;
     } 
   }
+  freq_t_merge_sort(ft);
   return ft;
+}
+
+static void merge_sort_recursive(FrequencyTable * ft, u_int left, u_int right, u_int *temp_freq, char *temp_keys) {
+  //TODO: implement recursive merge sort algorithm.
+}
+
+void freq_t_merge_sort(FrequencyTable * ft) // sort the FrequencyTable from least occuring char to most, using merge sort algorithm.
+{
+  //TODO implement merge sort of ft->freq while keeping keys ordered as ft->freq is.
 }
 
 void free_freq_t(FrequencyTable * ft) {
