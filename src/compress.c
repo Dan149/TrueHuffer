@@ -15,29 +15,6 @@ return EXIT_FAILURE;
 // src
 #include "compress.h"
 
-// Structs //
-
-struct TextObject {
-  char *deflatedContent;
-  char *inflatedContent;
-  char *checksum;
-};
-
-struct BinaryTree {
-  Node       *root;         // The node that holds them all.
-  TextObject *parent; // Who's the father ? (allows access to the parent TextObject from which the BinaryTree is derived from)
-};
-
-struct Node {
-  char letter; // single letter value.
-  u_int freq;  
-  Node *children; // children letters.
-};
-
-struct FrequencyTable {
-  char * keys;
-  u_int * freq;
-};
 
 ////////////
 
@@ -46,12 +23,11 @@ FrequencyTable * get_char_freq_table(char * s) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
   ft->keys = malloc(strlen(s)*sizeof(char));
-  ft->freq = calloc(0, sizeof(u_int));
+  ft->freq = calloc(1, sizeof(u_int));
   // TODO: Handle malloc errors.
-
-  for (int i = 0; i < strlen(s); i++) {
+  for (long unsigned int i = 0; i < strlen(s); i++) {
     bool char_found = false;
-    for (int j = 0; j < strlen(ft->keys); j++) {
+    for (long unsigned int j = 0; j < strlen(ft->keys); j++) {
       if (ft->keys[j] == s[i]) {
         char_found = true;
         ft->freq[i]++;
