@@ -22,42 +22,49 @@ return EXIT_FAILURE;
 FrequencyTable * get_char_freq_table(char * s) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
-  ft->keys = malloc(strlen(s)*sizeof(char));
-  ft->freq = calloc(1, sizeof(u_int));
+  ft->keys = malloc(1);
+  ft->freq = malloc(sizeof(u_int));
+  ft->freq=NULL;
   // TODO: Handle malloc errors.
   for (long unsigned int i = 0; i < strlen(s); i++) {
     bool char_found = false;
     for (long unsigned int j = 0; j < strlen(ft->keys); j++) {
       if (ft->keys[j] == s[i]) {
         char_found = true;
-        ft->freq[i]++;
+        ft->freq[j]++;
+        break;
       }
     }
     if (!char_found) {
-       char * temp = realloc(ft->keys, strlen(ft->keys)+2);
-       if (temp == NULL) {
-         free(ft->keys);
-         free(ft->freq);
-         free(ft);
-         return NULL;
-       }
-       ft->keys = temp;
-        
-       ft->keys[strlen(ft->keys)-1] = s[i];
-       
-       temp = realloc(ft->freq, sizeof(u_int)*strlen(ft->keys));  
-       if (temp == NULL) {
-         free(ft->keys);
-         free(ft->freq);
-         free(ft);
-         return NULL;
-       }
-       ft->freq[strlen(ft->keys)-1] = 1;
+      size_t cur_len = strlen(ft->keys);
+
+      char * k_tmp = realloc(ft->keys, cur_len+2);
+      if (k_tmp == NULL) {
+        free_freq_t(ft);
+        return NULL;
+      }
+      ft->keys = k_tmp; 
+      ft->keys[cur_len] = s[i];  
+      ft->keys[cur_len+1] = '\0';  
+      u_int * f_tmp;
+      f_tmp = realloc(ft->freq, sizeof(u_int)*(cur_len+1));  
+      if (f_tmp == NULL) {
+        free_freq_t(ft);
+        return NULL;
+      }
+      ft->freq = f_tmp;
+      ft->freq[cur_len] = 1;
     } 
   }
   return ft;
 }
 
+void free_freq_t(FrequencyTable * ft) {
+  if (ft == NULL) return;
+  free(ft->freq);
+  free(ft->keys);
+  free(ft);
+}
 
 TextObject *initTextObject(char * dc, char * ic) {
   // assume deflatedContent & inflatedContent either NULL or allocated, non-empty string :

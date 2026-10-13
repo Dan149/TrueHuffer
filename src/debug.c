@@ -1,5 +1,5 @@
 #include "debug.h"
-#include "../src/compress.h"
+#include "compress.h"
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
