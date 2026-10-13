@@ -1,10 +1,10 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -pedantic -Isrc
 
-TARGET = app
+TARGET = truehuffer
 
 # Separate core sources from GUI sources
-SRCS_CORE = main.c src/compress.c
+SRCS_CORE = main.c src/compress.c src/dict.c
 SRCS_GUI = src/gui.c
 
 OBJS_CORE = $(SRCS_CORE:.c=.o)

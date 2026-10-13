@@ -12,6 +12,7 @@ return EXIT_FAILURE;
 #endif
 // src
 #include "compress.h"
+#include "dict.h"
 
 
 // Structs //
@@ -49,8 +50,7 @@ FrequencyTable * get_char_freq_table(char * str) {
   // TODO: Handle malloc errors.
 
   for (int i = 0; i < strlen(str); i++) {
-    // DICTS OR NOT ?????
-    
+        
   }
   return ft;
 }
