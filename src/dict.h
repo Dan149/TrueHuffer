@@ -1,8 +1,15 @@
-//
-// Created by yloua on 13/10/2026.
-//
+#ifndef DICT_H
+#define DICT_H
 
-#ifndef TRUE_HUFFER_DICT_H
-#define TRUE_HUFFER_DICT_H
+struct nlist { /* table entry: */
+    struct nlist *next; /* next entry in chain */
+    char *name; /* defined name */
+    char *defn; /* replacement text */
+};
 
-#endif //TRUE_HUFFER_DICT_H
+unsigned hash(char *s);
+struct nlist *lookup(char *s);
+struct nlist *install(char *name, char *defn);
+char *strdupe(char *s);
+
+#endif /* DICT_H */
