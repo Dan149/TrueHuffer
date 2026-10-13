@@ -37,6 +37,7 @@
 *.hex
 app
 truehuffer
+test_runner
 
 # Debug files
 *.dSYM/
