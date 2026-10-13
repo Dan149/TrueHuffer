@@ -2,7 +2,14 @@
 #include <stdlib.h>
 #include <assert.h> // YANIS. Learn ts please.
 #include <string.h> // YANIS. Also, check docs for this.
+
+#if defined(_WIN32) // Checks OS an import corresponding library to use u_int
+#include <winsock.h>
+#elif defined(__linux__)
 #include <sys/types.h>
+#else
+return EXIT_FAILURE;
+#endif
 // src
 #include "compress.h"
 
@@ -28,7 +35,7 @@ struct Node {
 
 struct FrequencyTable {
   char * key;
-  uint * freq;
+  u_int * freq;
 };
 
 ////////////
@@ -38,7 +45,7 @@ FrequencyTable * get_char_freq_table(char * str) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
   ft->key = malloc(strlen(str)*sizeof(char));
-  ft->freq = calloc(strlen(str), sizeof(uint));
+  ft->freq = calloc(strlen(str), sizeof(u_int));
   // TODO: Handle malloc errors.
 
   for (int i = 0; i < strlen(str); i++) {
