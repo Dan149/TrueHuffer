@@ -1,4 +1,5 @@
 // std
+#include <stdbool.h>
 #include <stdlib.h>
 #include <assert.h> // YANIS. Learn ts please.
 #include <string.h> // YANIS. Also, check docs for this.
@@ -10,10 +11,9 @@
 #else
 return EXIT_FAILURE;
 #endif
+
 // src
 #include "compress.h"
-#include "dict.h"
-
 
 // Structs //
 
@@ -35,22 +35,49 @@ struct Node {
 };
 
 struct FrequencyTable {
-  char * key;
+  char * keys;
   u_int * freq;
 };
 
 ////////////
 
 
-FrequencyTable * get_char_freq_table(char * str) {
+FrequencyTable * get_char_freq_table(char * s) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
-  ft->key = malloc(strlen(str)*sizeof(char));
-  ft->freq = calloc(strlen(str), sizeof(u_int));
+  ft->keys = malloc(strlen(s)*sizeof(char));
+  ft->freq = calloc(0, sizeof(u_int));
   // TODO: Handle malloc errors.
 
-  for (int i = 0; i < strlen(str); i++) {
+  for (int i = 0; i < strlen(s); i++) {
+    bool char_found = false;
+    for (int j = 0; j < strlen(ft->keys); j++) {
+      if (ft->keys[j] == s[i]) {
+        char_found = true;
+        ft->freq[i]++;
+      }
+    }
+    if (!char_found) {
+       char * temp = realloc(ft->keys, strlen(ft->keys)+2);
+       if (temp == NULL) {
+         free(ft->keys);
+         free(ft->freq);
+         free(ft);
+         return NULL;
+       }
+       ft->keys = temp;
         
+       ft->keys[strlen(ft->keys)-1] = s[i];
+       
+       temp = realloc(ft->freq, sizeof(u_int)*strlen(ft->keys));  
+       if (temp == NULL) {
+         free(ft->keys);
+         free(ft->freq);
+         free(ft);
+         return NULL;
+       }
+       ft->freq[strlen(ft->keys)-1] = 1;
+    } 
   }
   return ft;
 }
