@@ -61,12 +61,60 @@ FrequencyTable * get_char_freq_table(char * s) {
 }
 
 static void merge_sort_recursive(FrequencyTable * ft, u_int left, u_int right, u_int *temp_freq, char *temp_keys) {
-  //TODO: implement recursive merge sort algorithm.
+	if (left >= right) return;
+	
+	u_int mid = left + (right-left) / 2;
+
+	merge_sort_recursive(ft, left, mid, temp_freq, temp_keys);
+	merge_sort_recursive(ft, mid+1, right, temp_freq, temp_keys);
+	
+	for (u_int i = left; i <= right; i++) {
+		temp_freq[i] = ft->freq[i];
+		temp_keys[i] = ft->keys[i];
+	}
+
+	u_int i = left; // left id
+	u_int j = mid+1;  // right id
+	u_int k = left; // main array id
+	
+	while (i <= mid && j <= right) { 
+		// invert operators for DESC order
+		if (temp_freq[i] <= temp_freq[j]) {
+			ft->freq[k] = temp_freq[i];
+			ft->keys[k] = temp_keys[i];
+			i++;
+		} else {
+			ft->freq[k] = temp_freq[j];
+			ft->keys[k] = temp_keys[j];
+			j++;
+		}
+		k++;
+	}
+
+	while (i <= mid) {
+			ft->freq[k] = temp_freq[i];
+			ft->keys[k] = temp_keys[i];
+			i++;
+			k++;
+	}
 }
 
 void freq_t_merge_sort(FrequencyTable * ft) // sort the FrequencyTable from least occuring char to most, using merge sort algorithm.
 {
-  //TODO implement merge sort of ft->freq while keeping keys ordered as ft->freq is.
+	assert(ft != NULL && ft->keys != NULL && ft->freq != NULL);
+	size_t len = strlen(ft->keys);
+	if (len <= 1) return;
+
+	u_int *temp_freq = malloc(len * sizeof(u_int));
+	char *temp_keys = malloc(len); // len * byte (8bits) | sizeof(char) == byte
+	
+	if (temp_freq == NULL || temp_keys == NULL) {
+	free(temp_keys); free(temp_freq);
+	return;
+	}
+
+	merge_sort_recursive(ft, 0, len-1, temp_freq, temp_keys);
+	free(temp_keys); free(temp_freq);
 }
 
 void free_freq_t(FrequencyTable * ft) {
