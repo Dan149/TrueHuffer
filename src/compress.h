@@ -19,11 +19,12 @@ typedef struct TextObject {
 typedef struct Node {
   char letter; // single letter value.
   u_int freq;  
-  struct Node *children; // children letters.
+  struct Node *child_a; // first children node.
+  struct Node *child_b; // second.
 } Node;
 
 typedef struct BinaryTree{
-  Node       *root;         // The node that holds them all.
+  Node       *root_node;         // The node that holds them all.
   TextObject *parent; // Who's the father ? (allows access to the parent TextObject from which the BinaryTree is derived from)
 } BinaryTree;
 
@@ -33,10 +34,16 @@ typedef struct FrequencyTable{
 } FrequencyTable;
 
 // TextObject implementation:
-TextObject *initTextObject(char * dc, char * ic); // dc and ic should be optional, NULL if unset. Allows inflate() and deflate equally.
+TextObject *init_text_obj(char * dc, char * ic); // dc and ic should be optional, NULL if unset. Allows inflate() and deflate equally.
+void free_text_obj(TextObject * to);
 
 // BinaryTree & Nodes
 int appendNode(Node * node_list, Node new_node); // 0: OK | -1: Err | realloc() the node_list, add new child node.
+
+void free_binary_tree(BinaryTree * bt);
+
+// FrequencyTable:
+
 FrequencyTable * get_char_freq_table(char * str);
 void free_freq_t(FrequencyTable * ft);
 void freq_t_merge_sort(FrequencyTable * ft); // sort the FrequencyTable from least occuring char to most, using merge sort algorithm.

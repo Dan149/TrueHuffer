@@ -39,7 +39,7 @@ FrequencyTable * get_char_freq_table(char * s) {
       size_t cur_len = strlen(ft->keys);
 
       char * k_tmp = realloc(ft->keys, cur_len+2);
-      if (k_tmp == NULL) {
+      if (!k_tmp) {
         free_freq_t(ft);
         return NULL;
       }
@@ -48,7 +48,7 @@ FrequencyTable * get_char_freq_table(char * s) {
       ft->keys[cur_len+1] = '\0';  
       u_int * f_tmp;
       f_tmp = realloc(ft->freq, sizeof(u_int)*(cur_len+1));  
-      if (f_tmp == NULL) {
+      if (!f_tmp) {
         free_freq_t(ft);
         return NULL;
       }
@@ -108,7 +108,7 @@ void freq_t_merge_sort(FrequencyTable * ft) // sort the FrequencyTable from leas
 	u_int *temp_freq = malloc(len * sizeof(u_int));
 	char *temp_keys = malloc(len); // len * byte (8bits) | sizeof(char) == byte
 	
-	if (temp_freq == NULL || temp_keys == NULL) {
+	if (!temp_freq || !temp_keys) {
 	free(temp_keys); free(temp_freq);
 	return;
 	}
@@ -118,15 +118,15 @@ void freq_t_merge_sort(FrequencyTable * ft) // sort the FrequencyTable from leas
 }
 
 void free_freq_t(FrequencyTable * ft) {
-  if (ft == NULL) return;
+  if (!ft) return;
   free(ft->freq);
   free(ft->keys);
   free(ft);
 }
 
-TextObject *initTextObject(char * dc, char * ic) {
+TextObject *init_text_obj(char * dc, char * ic) {
   // assume deflatedContent & inflatedContent either NULL or allocated, non-empty string :
-  assert((dc == NULL || strlen(dc) != 0) && (ic == NULL || strlen(ic) != 0)); 
+  assert((!dc || strlen(dc) != 0) && (!ic || strlen(ic) != 0)); 
 
   TextObject *to;
   to = malloc(sizeof(TextObject)); // to malloc or not to malloc ? That is the question. (seriously, I'm not sure this is good design, have to check later.)
@@ -136,3 +136,27 @@ TextObject *initTextObject(char * dc, char * ic) {
 
   return to;
 }
+
+void free_text_obj(TextObject * to) {
+	if (!to) return;
+	free(to->inflatedContent);
+	free(to->deflatedContent);
+	free(to);
+}
+
+static void free_node_recursive(Node * n) {
+	if (!n) return;
+	if (n->child_a) free_node_recursive(n->child_a);
+	if (n->child_b) free_node_recursive(n->child_b);
+
+	free(n->child_a); free(n->child_b); free(n);
+}
+
+void free_binary_tree(BinaryTree * bt) {
+	if (!bt) return;
+
+	free_node_recursive(bt->root_node);
+	free(bt);
+
+}
+
