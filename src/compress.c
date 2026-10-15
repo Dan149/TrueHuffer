@@ -1,4 +1,5 @@
 // std
+#include <iso646.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <assert.h> // YANIS. Learn ts please.
@@ -117,13 +118,6 @@ void freq_t_merge_sort(FrequencyTable * ft) // sort the FrequencyTable from leas
 	free(temp_keys); free(temp_freq);
 }
 
-void free_freq_t(FrequencyTable * ft) {
-  if (!ft) return;
-  free(ft->freq);
-  free(ft->keys);
-  free(ft);
-}
-
 TextObject *init_text_obj(char * dc, char * ic) {
   // assume deflatedContent & inflatedContent either NULL or allocated, non-empty string :
   assert((!dc || strlen(dc) != 0) && (!ic || strlen(ic) != 0)); 
@@ -135,6 +129,26 @@ TextObject *init_text_obj(char * dc, char * ic) {
   to->deflatedContent=dc;
 
   return to;
+}
+
+
+BinaryTree * build_btree(FrequencyTable * ft) {
+  // TODO: Biggest challenge yet.
+  // Build Binary Tree with the bottom-up algorithm.
+  BinaryTree * bt = malloc(sizeof(BinaryTree));
+
+
+  return bt;
+}
+
+
+// free functions:
+
+void free_freq_t(FrequencyTable * ft) {
+  if (!ft) return;
+  free(ft->freq);
+  free(ft->keys);
+  free(ft);
 }
 
 void free_text_obj(TextObject * to) {
@@ -152,7 +166,7 @@ static void free_node_recursive(Node * n) {
 	free(n->child_a); free(n->child_b); free(n);
 }
 
-void free_binary_tree(BinaryTree * bt) {
+void free_btree(BinaryTree * bt) {
 	if (!bt) return;
 
 	free_node_recursive(bt->root_node);

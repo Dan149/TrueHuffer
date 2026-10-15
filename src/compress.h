@@ -18,9 +18,10 @@ typedef struct TextObject {
 
 typedef struct Node {
   char letter; // single letter value.
-  u_int freq;  
+  u_int freq;  // either frequency of assigned letter or sum of both children below. (letter == NULL ? sum : letter freq)
   struct Node *child_a; // first children node.
   struct Node *child_b; // second.
+  u_int side :1; // 0: left side, 1: right side. Refer to Huffman method.
 } Node;
 
 typedef struct BinaryTree{
@@ -37,10 +38,8 @@ typedef struct FrequencyTable{
 TextObject *init_text_obj(char * dc, char * ic); // dc and ic should be optional, NULL if unset. Allows inflate() and deflate equally.
 void free_text_obj(TextObject * to);
 
-// BinaryTree & Nodes
-int appendNode(Node * node_list, Node new_node); // 0: OK | -1: Err | realloc() the node_list, add new child node.
-
-void free_binary_tree(BinaryTree * bt);
+//
+void free_btree(BinaryTree * bt);
 
 // FrequencyTable:
 
