@@ -17,7 +17,7 @@ typedef struct TextObject {
 } TextObject;
 
 typedef struct Node {
-  char letter; // single letter value.
+  char key; // single letter value.
   u_int freq;  // either frequency of assigned letter or sum of both children below. (letter == NULL ? sum : letter freq)
   struct Node *child_a; // first children node.
   struct Node *child_b; // second.

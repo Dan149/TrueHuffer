@@ -133,12 +133,67 @@ TextObject *init_text_obj(char * dc, char * ic) {
 
 
 BinaryTree * build_btree(FrequencyTable * ft) {
-  // TODO: Biggest challenge yet.
-  // Build Binary Tree with the bottom-up algorithm.
-  BinaryTree * bt = malloc(sizeof(BinaryTree));
+	// See Bottom up algorithm for logic.
+    BinaryTree * bt = malloc(sizeof(BinaryTree));
+    if (!bt || !ft || !ft->keys) return NULL;
 
+    size_t num_nodes = strlen(ft->keys);
+    
+    if (num_nodes == 0) {
+        bt->root_node = NULL;
+        return bt;
+    }
 
-  return bt;
+    // Allocate an array of Node pointers to serve as our working forest
+    Node **nodes = malloc(num_nodes * sizeof(Node*));
+    if (!nodes) {
+        free(bt);
+        return NULL;
+    }
+
+    // Initialize individual leaf nodes using the FrequencyTable data
+    for (size_t i = 0; i < num_nodes; i++) {
+        nodes[i] = malloc(sizeof(Node));
+        nodes[i]->key = ft->keys[i];
+        nodes[i]->freq = ft->freq[i];
+        nodes[i]->child_a = NULL;
+        nodes[i]->child_b = NULL;
+    }
+
+    // Execute the bottom-up algorithm: loop until only the root node remains
+    while (num_nodes > 1) {
+        // Re-sort the active array in descending order so the lowest frequencies are at the end
+        // A simple bubble sort suffices since num_nodes is small (max 256 for characters)
+        for (size_t i = 0; i < num_nodes - 1; i++) {
+            for (size_t j = 0; j < num_nodes - i - 1; j++) {
+                if (nodes[j]->freq < nodes[j+1]->freq) {
+                    Node *temp = nodes[j];
+                    nodes[j] = nodes[j+1];
+                    nodes[j+1] = temp;
+                }
+            }
+        }
+
+        // Extract the two lowest-frequency nodes
+        Node *left = nodes[num_nodes - 1];
+        Node *right = nodes[num_nodes - 2];
+
+        // Create a new parent node and assign the sub-trees
+        Node *parent = malloc(sizeof(Node));
+        parent->freq = left->freq + right->freq;
+        parent->key = '\0'; // Internal node marker
+        parent->child_a = left;
+        parent->child_b = right;
+
+        // Replace the right slot with the new parent and shrink the active pool
+        nodes[num_nodes - 2] = parent;
+        num_nodes--;
+    }
+
+    bt->root_node = nodes[0];
+    free(nodes);
+
+    return bt;
 }
 
 
