@@ -1,9 +1,8 @@
 #include "debug.h"
 #include "compress.h"
 #include <assert.h>
-#include <string.h>
 #include <stdio.h>
-
+#include <string.h>
 
 void print_freq_table(FrequencyTable *ft) {
   assert(ft != NULL && ft->keys != NULL && ft->freq != NULL);

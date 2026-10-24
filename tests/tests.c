@@ -1,16 +1,15 @@
-#include "../src/debug.h"
 #include "../src/compress.h"
-#include <stdlib.h>
+#include "../src/debug.h"
 #include <stdio.h>
-
+#include <stdlib.h>
 
 int main() {
 
-  char * str;
+  char *str;
   str = malloc(20);
   sprintf(str, "azzoxiej139821ejfie");
 
-  FrequencyTable * ft = get_char_freq_table(str);
+  FrequencyTable *ft = get_char_freq_table(str);
 
   print_freq_table(ft);
   free(str);

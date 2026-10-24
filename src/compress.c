@@ -1,8 +1,8 @@
 // std
+#include <assert.h> // YANIS. Learn ts please.
 #include <iso646.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <assert.h> // YANIS. Learn ts please.
 #include <string.h> // YANIS. Also, check docs for this.
 
 #if defined(_WIN32) // Checks OS an import corresponding library to use u_int
@@ -16,16 +16,14 @@ return EXIT_FAILURE;
 // src
 #include "compress.h"
 
-
 ////////////
 
-
-FrequencyTable * get_char_freq_table(char * s) {
+FrequencyTable *get_char_freq_table(char *s) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
   ft->keys = malloc(1);
   ft->freq = malloc(sizeof(u_int));
-  ft->freq=NULL;
+  ft->freq = NULL;
   // TODO: Handle malloc errors.
   for (long unsigned int i = 0; i < strlen(s); i++) {
     bool char_found = false;
@@ -39,193 +37,209 @@ FrequencyTable * get_char_freq_table(char * s) {
     if (!char_found) {
       size_t cur_len = strlen(ft->keys);
 
-      char * k_tmp = realloc(ft->keys, cur_len+2);
+      char *k_tmp = realloc(ft->keys, cur_len + 2);
       if (!k_tmp) {
         free_freq_t(ft);
         return NULL;
       }
-      ft->keys = k_tmp; 
-      ft->keys[cur_len] = s[i];  
-      ft->keys[cur_len+1] = '\0';  
-      u_int * f_tmp;
-      f_tmp = realloc(ft->freq, sizeof(u_int)*(cur_len+1));  
+      ft->keys = k_tmp;
+      ft->keys[cur_len] = s[i];
+      ft->keys[cur_len + 1] = '\0';
+      u_int *f_tmp;
+      f_tmp = realloc(ft->freq, sizeof(u_int) * (cur_len + 1));
       if (!f_tmp) {
         free_freq_t(ft);
         return NULL;
       }
       ft->freq = f_tmp;
       ft->freq[cur_len] = 1;
-    } 
+    }
   }
   freq_t_merge_sort(ft);
   return ft;
 }
 
-static void merge_sort_recursive(FrequencyTable * ft, u_int left, u_int right, u_int *temp_freq, char *temp_keys) {
-	if (left >= right) return;
-	
-	u_int mid = left + (right-left) / 2;
+static void merge_sort_recursive(FrequencyTable *ft, u_int left, u_int right,
+                                 u_int *temp_freq, char *temp_keys) {
+  if (left >= right)
+    return;
 
-	merge_sort_recursive(ft, left, mid, temp_freq, temp_keys);
-	merge_sort_recursive(ft, mid+1, right, temp_freq, temp_keys);
-	
-	for (u_int i = left; i <= right; i++) {
-		temp_freq[i] = ft->freq[i];
-		temp_keys[i] = ft->keys[i];
-	}
+  u_int mid = left + (right - left) / 2;
 
-	u_int i = left; // left id
-	u_int j = mid+1;  // right id
-	u_int k = left; // main array id
-	
-	while (i <= mid && j <= right) { 
-		// invert operators for DESC order
-		if (temp_freq[i] <= temp_freq[j]) {
-			ft->freq[k] = temp_freq[i];
-			ft->keys[k] = temp_keys[i];
-			i++;
-		} else {
-			ft->freq[k] = temp_freq[j];
-			ft->keys[k] = temp_keys[j];
-			j++;
-		}
-		k++;
-	}
+  merge_sort_recursive(ft, left, mid, temp_freq, temp_keys);
+  merge_sort_recursive(ft, mid + 1, right, temp_freq, temp_keys);
 
-	while (i <= mid) {
-			ft->freq[k] = temp_freq[i];
-			ft->keys[k] = temp_keys[i];
-			i++;
-			k++;
-	}
+  for (u_int i = left; i <= right; i++) {
+    temp_freq[i] = ft->freq[i];
+    temp_keys[i] = ft->keys[i];
+  }
+
+  u_int i = left;    // left id
+  u_int j = mid + 1; // right id
+  u_int k = left;    // main array id
+
+  while (i <= mid && j <= right) {
+    // invert operators for DESC order
+    if (temp_freq[i] <= temp_freq[j]) {
+      ft->freq[k] = temp_freq[i];
+      ft->keys[k] = temp_keys[i];
+      i++;
+    } else {
+      ft->freq[k] = temp_freq[j];
+      ft->keys[k] = temp_keys[j];
+      j++;
+    }
+    k++;
+  }
+
+  while (i <= mid) {
+    ft->freq[k] = temp_freq[i];
+    ft->keys[k] = temp_keys[i];
+    i++;
+    k++;
+  }
 }
 
-void freq_t_merge_sort(FrequencyTable * ft) // sort the FrequencyTable from least occuring char to most, using merge sort algorithm.
+void freq_t_merge_sort(
+    FrequencyTable *ft) // sort the FrequencyTable from least occuring char to
+                        // most, using merge sort algorithm.
 {
-	assert(ft != NULL && ft->keys != NULL && ft->freq != NULL);
-	size_t len = strlen(ft->keys);
-	if (len <= 1) return;
+  assert(ft != NULL && ft->keys != NULL && ft->freq != NULL);
+  size_t len = strlen(ft->keys);
+  if (len <= 1)
+    return;
 
-	u_int *temp_freq = malloc(len * sizeof(u_int));
-	char *temp_keys = malloc(len); // len * byte (8bits) | sizeof(char) == byte
-	
-	if (!temp_freq || !temp_keys) {
-	free(temp_keys); free(temp_freq);
-	return;
-	}
+  u_int *temp_freq = malloc(len * sizeof(u_int));
+  char *temp_keys = malloc(len); // len * byte (8bits) | sizeof(char) == byte
 
-	merge_sort_recursive(ft, 0, len-1, temp_freq, temp_keys);
-	free(temp_keys); free(temp_freq);
+  if (!temp_freq || !temp_keys) {
+    free(temp_keys);
+    free(temp_freq);
+    return;
+  }
+
+  merge_sort_recursive(ft, 0, len - 1, temp_freq, temp_keys);
+  free(temp_keys);
+  free(temp_freq);
 }
 
-TextObject *init_text_obj(char * dc, char * ic) {
-  // assume deflatedContent & inflatedContent either NULL or allocated, non-empty string :
-  assert((!dc || strlen(dc) != 0) && (!ic || strlen(ic) != 0)); 
+TextObject *init_text_obj(char *dc, char *ic) {
+  // assume deflatedContent & inflatedContent either NULL or allocated,
+  // non-empty string :
+  assert((!dc || strlen(dc) != 0) && (!ic || strlen(ic) != 0));
 
   TextObject *to;
-  to = malloc(sizeof(TextObject)); // to malloc or not to malloc ? That is the question. (seriously, I'm not sure this is good design, have to check later.)
+  to = malloc(sizeof(TextObject)); // to malloc or not to malloc ? That is the
+                                   // question. (seriously, I'm not sure this is
+                                   // good design, have to check later.)
 
-  to->inflatedContent=ic;
-  to->deflatedContent=dc;
+  to->inflatedContent = ic;
+  to->deflatedContent = dc;
 
   return to;
 }
 
+BinaryTree *build_btree(FrequencyTable *ft) {
+  // See Bottom up algorithm for logic.
+  BinaryTree *bt = malloc(sizeof(BinaryTree));
+  if (!bt || !ft || !ft->keys)
+    return NULL;
 
-BinaryTree * build_btree(FrequencyTable * ft) {
-	// See Bottom up algorithm for logic.
-    BinaryTree * bt = malloc(sizeof(BinaryTree));
-    if (!bt || !ft || !ft->keys) return NULL;
+  size_t num_nodes = strlen(ft->keys);
 
-    size_t num_nodes = strlen(ft->keys);
-    
-    if (num_nodes == 0) {
-        bt->root_node = NULL;
-        return bt;
-    }
-
-    // Allocate an array of Node pointers to serve as our working forest
-    Node **nodes = malloc(num_nodes * sizeof(Node*));
-    if (!nodes) {
-        free(bt);
-        return NULL;
-    }
-
-    // Initialize individual leaf nodes using the FrequencyTable data
-    for (size_t i = 0; i < num_nodes; i++) {
-        nodes[i] = malloc(sizeof(Node));
-        nodes[i]->key = ft->keys[i];
-        nodes[i]->freq = ft->freq[i];
-        nodes[i]->child_a = NULL;
-        nodes[i]->child_b = NULL;
-    }
-
-    // Execute the bottom-up algorithm: loop until only the root node remains
-    while (num_nodes > 1) {
-        // Re-sort the active array in descending order so the lowest frequencies are at the end
-        // A simple bubble sort suffices since num_nodes is small (max 256 for characters)
-        for (size_t i = 0; i < num_nodes - 1; i++) {
-            for (size_t j = 0; j < num_nodes - i - 1; j++) {
-                if (nodes[j]->freq < nodes[j+1]->freq) {
-                    Node *temp = nodes[j];
-                    nodes[j] = nodes[j+1];
-                    nodes[j+1] = temp;
-                }
-            }
-        }
-
-        // Extract the two lowest-frequency nodes
-        Node *left = nodes[num_nodes - 1];
-        Node *right = nodes[num_nodes - 2];
-
-        // Create a new parent node and assign the sub-trees
-        Node *parent = malloc(sizeof(Node));
-        parent->freq = left->freq + right->freq;
-        parent->key = '\0'; // Internal node marker
-        parent->child_a = left;
-        parent->child_b = right;
-
-        // Replace the right slot with the new parent and shrink the active pool
-        nodes[num_nodes - 2] = parent;
-        num_nodes--;
-    }
-
-    bt->root_node = nodes[0];
-    free(nodes);
-
+  if (num_nodes == 0) {
+    bt->root_node = NULL;
     return bt;
-}
+  }
 
+  // Allocate an array of Node pointers to serve as our working forest
+  Node **nodes = malloc(num_nodes * sizeof(Node *));
+  if (!nodes) {
+    free(bt);
+    return NULL;
+  }
+
+  // Initialize individual leaf nodes using the FrequencyTable data
+  for (size_t i = 0; i < num_nodes; i++) {
+    nodes[i] = malloc(sizeof(Node));
+    nodes[i]->key = ft->keys[i];
+    nodes[i]->freq = ft->freq[i];
+    nodes[i]->child_a = NULL;
+    nodes[i]->child_b = NULL;
+  }
+
+  // Execute the bottom-up algorithm: loop until only the root node remains
+  while (num_nodes > 1) {
+    // Re-sort the active array in descending order so the lowest frequencies
+    // are at the end A simple bubble sort suffices since num_nodes is small
+    // (max 256 for characters)
+    for (size_t i = 0; i < num_nodes - 1; i++) {
+      for (size_t j = 0; j < num_nodes - i - 1; j++) {
+        if (nodes[j]->freq < nodes[j + 1]->freq) {
+          Node *temp = nodes[j];
+          nodes[j] = nodes[j + 1];
+          nodes[j + 1] = temp;
+        }
+      }
+    }
+
+    // Extract the two lowest-frequency nodes
+    Node *left = nodes[num_nodes - 1];
+    Node *right = nodes[num_nodes - 2];
+
+    // Create a new parent node and assign the sub-trees
+    Node *parent = malloc(sizeof(Node));
+    parent->freq = left->freq + right->freq;
+    parent->key = '\0'; // Internal node marker
+    parent->child_a = left;
+    parent->child_b = right;
+
+    // Replace the right slot with the new parent and shrink the active pool
+    nodes[num_nodes - 2] = parent;
+    num_nodes--;
+  }
+
+  bt->root_node = nodes[0];
+  free(nodes);
+
+  return bt;
+}
 
 // free functions:
 
-void free_freq_t(FrequencyTable * ft) {
-  if (!ft) return;
+void free_freq_t(FrequencyTable *ft) {
+  if (!ft)
+    return;
   free(ft->freq);
   free(ft->keys);
   free(ft);
 }
 
-void free_text_obj(TextObject * to) {
-	if (!to) return;
-	free(to->inflatedContent);
-	free(to->deflatedContent);
-	free(to);
+void free_text_obj(TextObject *to) {
+  if (!to)
+    return;
+  free(to->inflatedContent);
+  free(to->deflatedContent);
+  free(to);
 }
 
-static void free_node_recursive(Node * n) {
-	if (!n) return;
-	if (n->child_a) free_node_recursive(n->child_a);
-	if (n->child_b) free_node_recursive(n->child_b);
+static void free_node_recursive(Node *n) {
+  if (!n)
+    return;
+  if (n->child_a)
+    free_node_recursive(n->child_a);
+  if (n->child_b)
+    free_node_recursive(n->child_b);
 
-	free(n->child_a); free(n->child_b); free(n);
+  free(n->child_a);
+  free(n->child_b);
+  free(n);
 }
 
-void free_btree(BinaryTree * bt) {
-	if (!bt) return;
+void free_btree(BinaryTree *bt) {
+  if (!bt)
+    return;
 
-	free_node_recursive(bt->root_node);
-	free(bt);
-
+  free_node_recursive(bt->root_node);
+  free(bt);
 }
-

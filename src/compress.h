@@ -17,38 +17,45 @@ typedef struct TextObject {
 } TextObject;
 
 typedef struct Node {
-  char key; // single letter value.
-  u_int freq;  // either frequency of assigned letter or sum of both children below. (letter == NULL ? sum : letter freq)
+  char key;   // single letter value.
+  u_int freq; // either frequency of assigned letter or sum of both children
+              // below. (letter == NULL ? sum : letter freq)
   struct Node *child_a; // first children node.
   struct Node *child_b; // second.
-  u_int side :1; // 0: left side, 1: right side. Refer to Huffman method.
+  u_int side : 1;       // 0: left side, 1: right side. Refer to Huffman method.
 } Node;
 
-typedef struct BinaryTree{
-  Node       *root_node;         // The node that holds them all.
-  TextObject *parent; // Who's the father ? (allows access to the parent TextObject from which the BinaryTree is derived from)
+typedef struct BinaryTree {
+  Node *root_node;    // The node that holds them all.
+  TextObject *parent; // Who's the father ? (allows access to the parent
+                      // TextObject from which the BinaryTree is derived from)
 } BinaryTree;
 
-typedef struct FrequencyTable{
-  char * keys;
-  u_int * freq;
+typedef struct FrequencyTable {
+  char *keys;
+  u_int *freq;
 } FrequencyTable;
 
 // TextObject implementation:
-TextObject *init_text_obj(char * dc, char * ic); // dc and ic should be optional, NULL if unset. Allows inflate() and deflate equally.
-void free_text_obj(TextObject * to);
+TextObject *
+init_text_obj(char *dc,
+              char *ic); // dc and ic should be optional, NULL if unset. Allows
+                         // inflate() and deflate equally.
+void free_text_obj(TextObject *to);
 
 //
-void free_btree(BinaryTree * bt);
+void free_btree(BinaryTree *bt);
 
 // FrequencyTable:
 
-FrequencyTable * get_char_freq_table(char * str);
-void free_freq_t(FrequencyTable * ft);
-void freq_t_merge_sort(FrequencyTable * ft); // sort the FrequencyTable from least occuring char to most, using merge sort algorithm.
+FrequencyTable *get_char_freq_table(char *str);
+void free_freq_t(FrequencyTable *ft);
+void freq_t_merge_sort(
+    FrequencyTable *ft); // sort the FrequencyTable from least occuring char to
+                         // most, using merge sort algorithm.
 
 //
 int inflate(TextObject *obj); // Make it big.
 int deflate(TextObject *obj); // Make it smol.
 
-#endif //COMPRESS_H
+#endif // COMPRESS_H
