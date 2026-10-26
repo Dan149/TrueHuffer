@@ -22,8 +22,8 @@ FrequencyTable *get_char_freq_table(char *s) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
   ft->keys = malloc(1);
+  ft->keys[0] = '\0';
   ft->freq = malloc(sizeof(u_int));
-  ft->freq = NULL;
   // TODO: Handle malloc errors.
   for (long unsigned int i = 0; i < strlen(s); i++) {
     bool char_found = false;
@@ -231,8 +231,6 @@ static void free_node_recursive(Node *n) {
   if (n->child_b)
     free_node_recursive(n->child_b);
 
-  free(n->child_a);
-  free(n->child_b);
   free(n);
 }
 

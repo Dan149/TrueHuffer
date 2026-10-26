@@ -22,7 +22,6 @@ typedef struct Node {
               // below. (letter == NULL ? sum : letter freq)
   struct Node *child_a; // first children node.
   struct Node *child_b; // second.
-  u_int side : 1;       // 0: left side, 1: right side. Refer to Huffman method.
 } Node;
 
 typedef struct BinaryTree {
@@ -44,6 +43,7 @@ init_text_obj(char *dc,
 void free_text_obj(TextObject *to);
 
 //
+BinaryTree *build_btree(FrequencyTable *ft);
 void free_btree(BinaryTree *bt);
 
 // FrequencyTable:
