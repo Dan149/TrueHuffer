@@ -8,24 +8,47 @@ TrueHuffer, programme de compression de fichiers basé sur la méthode Huffman.
 Nous avons décidé de commenter le code en anglais durant le développement. Si cela change pour la version finale, ne soyez pas étonnée de trouver des explications en anglais dans les commits précédents de ma part pour Yanis et inversement.
 De la même manière, le nom des variables & fonctions est en anglais.
 
-## Roadmap
+___
 
-### 1 : Creer les fonctions principales
+## Documentation du Makefile
 
-Deflate (compression) et inflate (décompressions) dans src/compression.c
+Ce Makefile permet de compiler l'application principale (avec ou sans interface graphique) ainsi que sa suite de tests. Il est configuré pour utiliser le compilateur `gcc` avec des drapeaux de compilation stricts (`-Wall -Wextra -Werror -pedantic`) pour garantir la qualité du code.
 
-### 2 : Gestion d'erreurs
+### 🚀 Commandes disponibles (Cibles)
 
-Gestion en cas de plantage, ou de overflow memoire 
+Voici les différentes commandes que vous pouvez exécuter dans votre terminal :
 
-### 3 L'ouverture et utilisation via Shell
+*   **`make`** ou **`make all`** (Cible par défaut)
+    Compile l'application standard complète (nommée `app`) en incluant l'interface graphique (GUI).
+    
+*   **`make no-gui`**
+    Compile une version de l'application sans l'interface graphique. 
+    *Note technique : Cette cible ajoute la macro `-DNO_GUI` à la compilation, nettoie automatiquement les anciens fichiers objets pour éviter les conflits, et exclut les fichiers sources liés au GUI.*
 
-Utilisation classique (execution dans console avec argument)
+*   **`make tests`**
+    Compile et exécute automatiquement la suite de tests (génère l'exécutable `test_runner`).
+    *Note technique : Lors de la compilation des tests, la fonction `tests()` est redéfinie en `main()` via le préprocesseur (`-Dtests=main`).*
 
-### 4 : Interface utilisateur
+*   **`make clean`**
+    Nettoie complètement le projet en supprimant tous les fichiers objets (`.o`) ainsi que les exécutables générés (`app` et `test_runner`).
 
-Création d'une interface type 7-zip / WinRAR (Design : Yanis, Code : Daniel)
+*   **`make clean-obj`**
+    Supprime uniquement les fichiers objets (`.o`), en conservant les exécutables finaux.
 
-### 5 : Tests
+### 📁 Structure des sources attendue
 
-Compressions puis décompressions en chaine suivis de chekcsum (verification de l'identicité des fichiers)
+Le Makefile s'attend à l'arborescence suivante pour fonctionner correctement :
+
+*   `main.c` : Point d'entrée de l'application.
+*   `src/` : Dossier contenant le code source.
+    *   `src/compress.c`, `src/debug.c` : Fichiers cœurs (utilisés par l'app et les tests).
+    *   `src/gui.c` : Fichiers de l'interface graphique.
+*   `tests/` : Dossier contenant les tests.
+    *   `tests/tests.c` : Point d'entrée de la suite de tests.
+
+### ⚙️ Configuration
+
+*   **Compilateur :** `gcc`
+*   **Dossier d'inclusion (`Include`) :** `-Isrc`
+*   **Exécutable principal :** `app`
+*   **Exécutable de test :** `test_runner`

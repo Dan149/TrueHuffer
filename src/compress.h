@@ -35,11 +35,10 @@ typedef struct FrequencyTable {
   u_int *freq;
 } FrequencyTable;
 
+bool isFileDeflated(char *buf);
+
 // TextObject implementation:
-TextObject *
-init_text_obj(char *dc,
-              char *ic); // dc and ic should be optional, NULL if unset. Allows
-                         // inflate() and deflate equally.
+TextObject *init_text_obj(char *filepath);
 void free_text_obj(TextObject *to);
 
 //

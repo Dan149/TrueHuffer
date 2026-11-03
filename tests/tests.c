@@ -27,7 +27,7 @@ int main() {
   buf[bytes_read] = '\0';
   fclose(fptr);
 
-  // ENd of file reading //
+  // End of file reading //
 
   FrequencyTable *ft = get_char_freq_table(buf);
 

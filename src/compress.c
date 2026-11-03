@@ -1,9 +1,10 @@
 // std
-#include <assert.h> // YANIS. Learn ts please.
+#include <assert.h>
 #include <iso646.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> // YANIS. Also, check docs for this.
+#include <string.h>
 
 #if defined(_WIN32) // Checks OS an import corresponding library to use u_int
 #include <winsock.h>
@@ -123,22 +124,6 @@ void freq_t_merge_sort(
   free(temp_freq);
 }
 
-TextObject *init_text_obj(char *dc, char *ic) {
-  // assume deflatedContent & inflatedContent either NULL or allocated,
-  // non-empty string :
-  assert((!dc || strlen(dc) != 0) && (!ic || strlen(ic) != 0));
-
-  TextObject *to;
-  to = malloc(sizeof(TextObject)); // to malloc or not to malloc ? That is the
-                                   // question. (seriously, I'm not sure this is
-                                   // good design, have to check later.)
-
-  to->inflatedContent = ic;
-  to->deflatedContent = dc;
-
-  return to;
-}
-
 BinaryTree *build_btree(FrequencyTable *ft) {
   // See Bottom up algorithm for logic.
   BinaryTree *bt = malloc(sizeof(BinaryTree));
@@ -203,6 +188,89 @@ BinaryTree *build_btree(FrequencyTable *ft) {
   free(nodes);
 
   return bt;
+}
+
+bool endsWith(const char *str, const char *suffix) {
+  if (!str || !suffix)
+    return false;
+
+  size_t lenstr = strlen(str);
+  size_t lensuffix = strlen(suffix);
+
+  if (lensuffix > lenstr)
+    return false;
+
+  return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
+TextObject *init_text_obj(char *filepath) {
+  // INFO: TrueHuffer's deflated files will have the file type: <.thman>.
+  // Moreover, TrueHuffer deflated files start with a header, between the ASCII
+  // chars for header_start and file_start See: www.ascii-code.com
+  // Example:
+  // 1 (header_start char) 127... (HEADER) 2 (file_start char)
+  // ---
+  // Header composition:
+  // first header char will always be N°127.
+  // Nothing else for now.
+  assert(filepath);
+  TextObject *to = malloc(sizeof(TextObject));
+  char *buf;
+
+  // Reading file //
+  FILE *fptr = fopen(filepath, "rb");
+  assert(fptr);
+
+  // Get file size
+  fseek(fptr, 0, SEEK_END);     // moving cursor to EOF.
+  long file_size = ftell(fptr); // getting byte amount.
+  fseek(fptr, 0, SEEK_SET);     // moving back to top.
+
+  buf = (char *)malloc(file_size + 1);
+  if (!buf) {
+    fclose(fptr);
+    return EXIT_FAILURE;
+  }
+
+  size_t bytes_read = fread(buf, 1, file_size, fptr);
+  buf[bytes_read] = '\0';
+  fclose(fptr);
+  // End of file reading //
+
+  // Is file inflated or deflated ?
+
+  if (endsWith(filepath, ".thman"))
+    to->deflatedContent = buf;
+  else
+    to->inflatedContent = buf;
+
+  return to;
+}
+
+static int writeTextObjToFile(TextObject *to, const char *filepath) {
+  if (to->deflatedContent == NULL && to->inflatedContent == NULL)
+    return EXIT_FAILURE;
+  const char HEAD[3] = {1, 127, 2};
+  FILE *fp;
+  fp = fopen(filepath, "wb");
+  if (!fp) {
+    perror("Failed to open file in wb mode.");
+    return EXIT_FAILURE;
+  }
+  if (to->deflatedContent == NULL) {
+    // inflatedContent write.
+  } else if (to->inflatedContent == NULL) {
+    // deflatedContent write.
+    size_t len = strlen(to->deflatedContent);
+    fwrite(HEAD, sizeof(char), 3, fp);
+    size_t written = fwrite(to->deflatedContent, sizeof(char), len, fp);
+  } else
+    return EXIT_FAILURE; // Both contents are not null.
+  return EXIT_SUCCESS;
+}
+
+bool isFileDeflated(char *buf) {
+  return buf[0] == 1 && buf[1] == 127 && buf[2] == 2;
 }
 
 // free functions:
