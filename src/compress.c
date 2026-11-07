@@ -127,7 +127,8 @@ void freq_t_merge_sort(
 static char *freq_table_to_bytes(FrequencyTable *ft) {
   assert(ft->freq && ft->keys);
   char *buf;
-  size_t i, j = 0;
+  size_t i = 0;
+  size_t j = 0;
   size_t buf_size = strlen(ft->keys) * 5;
   buf = malloc(buf_size);
   while (j < strlen(ft->keys)) {
@@ -179,15 +180,15 @@ static FrequencyTable *parse_freq_table(char *str) {
   // builds FrequencyTable struct from a string storing a FrequencyTable.
   assert(str);
   FrequencyTable *ft = malloc(sizeof(FrequencyTable));
-  ft->keys = malloc(sizeof(char));
+  ft->keys = malloc(256);
   ft->freq = malloc(256 * sizeof(u_int));
   u_int ft_index = 0;
   for (size_t x = 0; x < strlen(str); x++) {
     ft->keys[ft_index] = str[x];
 
     char *freq_str;
-    int fs_length;
-    int y = x;
+    int fs_length = 0;
+    size_t y = x;
     while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n') {
       fs_length++;
       y++;
@@ -195,12 +196,13 @@ static FrequencyTable *parse_freq_table(char *str) {
 
     freq_str = malloc(fs_length + 1);
     y = x;
-    while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n') {
+    while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n' &&
+           y + 2 < strlen(str)) {
       freq_str[y] = str[y];
       y++;
     }
     freq_str[y] = '\0';
-    if (scanf(freq_str, "%u", ft->freq[ft_index]) != 1) {
+    if (sscanf(freq_str, "%u", &ft->freq[ft_index]) != 1) {
       perror("Failed to parse frequency value from string.");
       free_freq_t(ft);
       free(freq_str);

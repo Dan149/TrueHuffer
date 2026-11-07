@@ -19,6 +19,8 @@ int main() {
 
   printf("%s\n\n", to->deflatedContent);
 
+  free_text_obj(to);
+
   // End of file reading //
 
   // FrequencyTable *ft = get_char_freq_table(buf);
