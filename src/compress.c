@@ -19,7 +19,7 @@ return EXIT_FAILURE;
 
 ////////////
 
-FrequencyTable *get_char_freq_table(char *s) {
+FrequencyTable *get_freq_table(char *s) {
   FrequencyTable *ft;
   ft = malloc(sizeof(FrequencyTable));
   ft->keys = malloc(1);
@@ -60,8 +60,8 @@ FrequencyTable *get_char_freq_table(char *s) {
   return ft;
 }
 
-static void merge_sort_recursive(FrequencyTable *ft, u_int left, u_int right,
-                                 u_int *temp_freq, char *temp_keys) {
+void merge_sort_recursive(FrequencyTable *ft, u_int left, u_int right,
+                          u_int *temp_freq, char *temp_keys) {
   if (left >= right)
     return;
 
@@ -122,6 +122,97 @@ void freq_t_merge_sort(
   merge_sort_recursive(ft, 0, len - 1, temp_freq, temp_keys);
   free(temp_keys);
   free(temp_freq);
+}
+
+static char *freq_table_to_bytes(FrequencyTable *ft) {
+  assert(ft->freq && ft->keys);
+  char *buf;
+  size_t i, j = 0;
+  size_t buf_size = strlen(ft->keys) * 5;
+  buf = malloc(buf_size);
+  while (j < strlen(ft->keys)) {
+    buf[i] = ft->keys[j];
+    i++;
+
+    if (ft->freq[j] <= 9) {
+      buf[i] = '0' + ft->freq[j];
+      i++;
+    } else {
+      int freq_length = snprintf(NULL, 0, "%u", ft->freq[j]);
+
+      if (freq_length < 1) {
+        perror("Failed to format freq_table value.");
+        free(buf);
+        return NULL;
+      }
+
+      char *nb_str = malloc(freq_length + 1); // don't forget '\0' ;)
+      snprintf(nb_str, freq_length + 1, "%u", ft->freq[j]);
+
+      char *rb = realloc(buf, buf_size + freq_length);
+      if (!rb) {
+        perror("Failed to reallocate buffer.");
+        free(buf);
+        free(nb_str);
+        return NULL;
+      }
+      buf = rb;
+      buf_size += freq_length;
+
+      for (int x = 0; x < freq_length; x++) {
+        buf[i] = nb_str[x];
+        i++;
+      }
+      free(nb_str);
+    }
+    buf[i] = '\n';
+    buf[i + 1] = 25;
+    buf[i + 2] = '\n';
+
+    i += 3;
+    j++;
+  }
+  return buf;
+}
+
+static FrequencyTable *parse_freq_table(char *str) {
+  // builds FrequencyTable struct from a string storing a FrequencyTable.
+  assert(str);
+  FrequencyTable *ft = malloc(sizeof(FrequencyTable));
+  ft->keys = malloc(sizeof(char));
+  ft->freq = malloc(256 * sizeof(u_int));
+  u_int ft_index = 0;
+  for (size_t x = 0; x < strlen(str); x++) {
+    ft->keys[ft_index] = str[x];
+
+    char *freq_str;
+    int fs_length;
+    int y = x;
+    while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n') {
+      fs_length++;
+      y++;
+    }
+
+    freq_str = malloc(fs_length + 1);
+    y = x;
+    while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n') {
+      freq_str[y] = str[y];
+      y++;
+    }
+    freq_str[y] = '\0';
+    if (scanf(freq_str, "%u", ft->freq[ft_index]) != 1) {
+      perror("Failed to parse frequency value from string.");
+      free_freq_t(ft);
+      free(freq_str);
+      return NULL;
+    }
+    x = y - x + 2; // here str[x] would point to the last '\n' of the separator
+                   // sequence. bytes(\n 25 \n)
+    assert(str[x] == '\n');
+    ft_index++;
+  }
+
+  return ft;
 }
 
 BinaryTree *build_btree(FrequencyTable *ft) {
@@ -219,7 +310,10 @@ TextObject *init_text_obj(char *filepath) {
 
   // Reading file //
   FILE *fptr = fopen(filepath, "rb");
-  assert(fptr);
+  if (!fptr) {
+    perror("Error: file not found.");
+    return NULL;
+  }
 
   // Get file size
   fseek(fptr, 0, SEEK_END);     // moving cursor to EOF.
@@ -229,7 +323,7 @@ TextObject *init_text_obj(char *filepath) {
   buf = (char *)malloc(file_size + 1);
   if (!buf) {
     fclose(fptr);
-    return EXIT_FAILURE;
+    return NULL;
   }
 
   size_t bytes_read = fread(buf, 1, file_size, fptr);
@@ -247,27 +341,58 @@ TextObject *init_text_obj(char *filepath) {
   return to;
 }
 
-static int writeTextObjToFile(TextObject *to, const char *filepath) {
-  if (to->deflatedContent == NULL && to->inflatedContent == NULL)
+int deflate(TextObject *to) {
+  if (to->inflatedContent == NULL)
     return EXIT_FAILURE;
-  const char HEAD[3] = {1, 127, 2};
-  FILE *fp;
-  fp = fopen(filepath, "wb");
-  if (!fp) {
-    perror("Failed to open file in wb mode.");
+
+  FrequencyTable *ft = get_freq_table(to->inflatedContent);
+  if (!ft)
     return EXIT_FAILURE;
-  }
-  if (to->deflatedContent == NULL) {
-    // inflatedContent write.
-  } else if (to->inflatedContent == NULL) {
-    // deflatedContent write.
-    size_t len = strlen(to->deflatedContent);
-    fwrite(HEAD, sizeof(char), 3, fp);
-    size_t written = fwrite(to->deflatedContent, sizeof(char), len, fp);
-  } else
-    return EXIT_FAILURE; // Both contents are not null.
+
+  to->deflatedContent = freq_table_to_bytes(ft);
+  free_freq_t(ft);
+  free(to->inflatedContent);
+  to->inflatedContent = NULL;
+
   return EXIT_SUCCESS;
 }
+
+int inflate(TextObject *to) {
+  if (to->deflatedContent == NULL)
+    return EXIT_FAILURE;
+
+  FrequencyTable *ft = parse_freq_table(to->deflatedContent);
+  if (!ft)
+    return EXIT_FAILURE;
+  to->inflatedContent = freq_table_to_bytes(ft);
+  free_freq_t(ft);
+  free(to->deflatedContent);
+  to->deflatedContent = NULL;
+
+  return EXIT_SUCCESS;
+}
+
+// int writeTextObjToFile(TextObject *to, const char *filepath) {
+//   if (to->deflatedContent == NULL && to->inflatedContent == NULL)
+//     return EXIT_FAILURE;
+//   const char HEAD[3] = {1, 127, 2};
+//   FILE *fp;
+//   fp = fopen(filepath, "wb");
+//   if (!fp) {
+//     perror("Failed to open file in wb mode.");
+//     return EXIT_FAILURE;
+//   }
+//   if (to->deflatedContent == NULL) {
+//     // inflatedContent write.
+//   } else if (to->inflatedContent == NULL) {
+//     // deflatedContent write.
+//     size_t len = strlen(to->deflatedContent);
+//     fwrite(HEAD, sizeof(char), 3, fp);
+//     size_t written = fwrite(to->deflatedContent, sizeof(char), len, fp);
+//   } else
+//     return EXIT_FAILURE; // Both contents are not null.
+//   return EXIT_SUCCESS;
+// }
 
 bool isFileDeflated(char *buf) {
   return buf[0] == 1 && buf[1] == 127 && buf[2] == 2;

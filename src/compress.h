@@ -47,7 +47,7 @@ void free_btree(BinaryTree *bt);
 
 // FrequencyTable:
 
-FrequencyTable *get_char_freq_table(char *str);
+FrequencyTable *get_freq_table(char *str);
 void free_freq_t(FrequencyTable *ft);
 void freq_t_merge_sort(
     FrequencyTable *ft); // sort the FrequencyTable from least occuring char to
