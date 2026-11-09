@@ -1,83 +1,89 @@
 // std
-#include <assert.h>
-#include <iso646.h>
+#include <errno.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32) // Checks OS an import corresponding library to use u_int
-#include <winsock.h>
-#elif defined(__linux__)
-#include <sys/types.h>
-#else
-return EXIT_FAILURE;
-#endif
-
 // src
 #include "compress.h"
 
+#define HEADER_MAGIC_LEN 3
+#define HEADER_COUNT_LEN 2
+#define HEADER_ENTRY_LEN 5 // 1 byte key + 4 bytes frequency
+#define MAX_SYMBOLS 256
+#define MAX_CODE_LEN 64 // codes are stored in a uint64_t
+
+static const unsigned char HEADER_MAGIC[HEADER_MAGIC_LEN] = {1, 127, 2};
+
+////////////
+// Errors //
 ////////////
 
-FrequencyTable *get_freq_table(char *s) {
-  FrequencyTable *ft;
-  ft = malloc(sizeof(FrequencyTable));
-  ft->keys = malloc(1);
-  ft->keys[0] = '\0';
-  ft->freq = malloc(sizeof(u_int));
-  // TODO: Handle malloc errors.
-  for (long unsigned int i = 0; i < strlen(s); i++) {
-    bool char_found = false;
-    for (long unsigned int j = 0; j < strlen(ft->keys); j++) {
-      if (ft->keys[j] == s[i]) {
-        char_found = true;
-        ft->freq[j]++;
-        break;
-      }
-    }
-    if (!char_found) {
-      size_t cur_len = strlen(ft->keys);
+static char last_error[256] = "";
 
-      char *k_tmp = realloc(ft->keys, cur_len + 2);
-      if (!k_tmp) {
-        free_freq_t(ft);
-        return NULL;
-      }
-      ft->keys = k_tmp;
-      ft->keys[cur_len] = s[i];
-      ft->keys[cur_len + 1] = '\0';
-      u_int *f_tmp;
-      f_tmp = realloc(ft->freq, sizeof(u_int) * (cur_len + 1));
-      if (!f_tmp) {
-        free_freq_t(ft);
-        return NULL;
-      }
-      ft->freq = f_tmp;
-      ft->freq[cur_len] = 1;
-    }
-  }
-  freq_t_merge_sort(ft);
-  return ft;
+#if defined(__GNUC__)
+__attribute__((format(printf, 1, 2)))
+#endif
+static void set_error(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(last_error, sizeof(last_error), fmt, ap);
+  va_end(ap);
 }
 
-void merge_sort_recursive(FrequencyTable *ft, u_int left, u_int right,
-                          u_int *temp_freq, char *temp_keys) {
+const char *compress_last_error(void) {
+  return last_error[0] ? last_error : "unknown error";
+}
+
+// Helpers:
+static void put_u32_le(unsigned char *p, uint32_t v) {
+  p[0] = (unsigned char)(v & 0xFFu);
+  p[1] = (unsigned char)((v >> 8) & 0xFFu);
+  p[2] = (unsigned char)((v >> 16) & 0xFFu);
+  p[3] = (unsigned char)((v >> 24) & 0xFFu);
+}
+
+static uint32_t get_u32_le(const unsigned char *p) {
+  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+         ((uint32_t)p[3] << 24);
+}
+
+static bool endsWith(const char *str, const char *suffix) {
+  if (!str || !suffix)
+    return false;
+
+  size_t lenstr = strlen(str);
+  size_t lensuffix = strlen(suffix);
+
+  if (lensuffix > lenstr)
+    return false;
+
+  return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
+// FrequencyTable
+
+static void merge_sort_recursive(FrequencyTable *ft, size_t left, size_t right,
+                                 uint32_t *temp_freq,
+                                 unsigned char *temp_keys) {
   if (left >= right)
     return;
 
-  u_int mid = left + (right - left) / 2;
+  size_t mid = left + (right - left) / 2;
 
   merge_sort_recursive(ft, left, mid, temp_freq, temp_keys);
   merge_sort_recursive(ft, mid + 1, right, temp_freq, temp_keys);
 
-  for (u_int i = left; i <= right; i++) {
-    temp_freq[i] = ft->freq[i];
-    temp_keys[i] = ft->keys[i];
+  for (size_t x = left; x <= right; x++) {
+    temp_freq[x] = ft->freq[x];
+    temp_keys[x] = ft->keys[x];
   }
 
-  u_int i = left;    // left id
-  u_int j = mid + 1; // right id
-  u_int k = left;    // main array id
+  size_t i = left;    // left id
+  size_t j = mid + 1; // right id
+  size_t k = left;    // main array id
 
   while (i <= mid && j <= right) {
     // invert operators for DESC order
@@ -93,6 +99,7 @@ void merge_sort_recursive(FrequencyTable *ft, u_int left, u_int right,
     k++;
   }
 
+  // Whatever is left of the right half is already at its final place.
   while (i <= mid) {
     ft->freq[k] = temp_freq[i];
     ft->keys[k] = temp_keys[i];
@@ -105,302 +112,64 @@ void freq_t_merge_sort(
     FrequencyTable *ft) // sort the FrequencyTable from least occuring char to
                         // most, using merge sort algorithm.
 {
-  assert(ft != NULL && ft->keys != NULL && ft->freq != NULL);
-  size_t len = strlen(ft->keys);
-  if (len <= 1)
+  if (!ft || !ft->keys || !ft->freq || ft->size <= 1)
     return;
 
-  u_int *temp_freq = malloc(len * sizeof(u_int));
-  char *temp_keys = malloc(len); // len * byte (8bits) | sizeof(char) == byte
+  uint32_t *temp_freq = malloc(ft->size * sizeof(uint32_t));
+  unsigned char *temp_keys = malloc(ft->size);
 
   if (!temp_freq || !temp_keys) {
     free(temp_keys);
     free(temp_freq);
-    return;
+    return; // table stays unsorted, which is still a valid table.
   }
 
-  merge_sort_recursive(ft, 0, len - 1, temp_freq, temp_keys);
+  merge_sort_recursive(ft, 0, ft->size - 1, temp_freq, temp_keys);
   free(temp_keys);
   free(temp_freq);
 }
 
-static char *freq_table_to_bytes(FrequencyTable *ft) {
-  assert(ft->freq && ft->keys);
-  char *buf;
-  size_t i = 0;
-  size_t j = 0;
-  size_t buf_size = strlen(ft->keys) * 5;
-  buf = malloc(buf_size);
-  while (j < strlen(ft->keys)) {
-    buf[i] = ft->keys[j];
-    i++;
-
-    if (ft->freq[j] <= 9) {
-      buf[i] = '0' + ft->freq[j];
-      i++;
-    } else {
-      int freq_length = snprintf(NULL, 0, "%u", ft->freq[j]);
-
-      if (freq_length < 1) {
-        perror("Failed to format freq_table value.");
-        free(buf);
-        return NULL;
-      }
-
-      char *nb_str = malloc(freq_length + 1); // don't forget '\0' ;)
-      snprintf(nb_str, freq_length + 1, "%u", ft->freq[j]);
-
-      char *rb = realloc(buf, buf_size + freq_length);
-      if (!rb) {
-        perror("Failed to reallocate buffer.");
-        free(buf);
-        free(nb_str);
-        return NULL;
-      }
-      buf = rb;
-      buf_size += freq_length;
-
-      for (int x = 0; x < freq_length; x++) {
-        buf[i] = nb_str[x];
-        i++;
-      }
-      free(nb_str);
-    }
-    buf[i] = '\n';
-    buf[i + 1] = 25;
-    buf[i + 2] = '\n';
-
-    i += 3;
-    j++;
-  }
-  return buf;
-}
-
-static FrequencyTable *parse_freq_table(char *str) {
-  // builds FrequencyTable struct from a string storing a FrequencyTable.
-  assert(str);
-  FrequencyTable *ft = malloc(sizeof(FrequencyTable));
-  ft->keys = malloc(256);
-  ft->freq = malloc(256 * sizeof(u_int));
-  u_int ft_index = 0;
-  for (size_t x = 0; x < strlen(str); x++) {
-    ft->keys[ft_index] = str[x];
-
-    char *freq_str;
-    int fs_length = 0;
-    size_t y = x;
-    while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n') {
-      fs_length++;
-      y++;
-    }
-
-    freq_str = malloc(fs_length + 1);
-    y = x;
-    while (str[y] != '\n' && str[y + 1] != 25 && str[y + 2] != '\n' &&
-           y + 2 < strlen(str)) {
-      freq_str[y] = str[y];
-      y++;
-    }
-    freq_str[y] = '\0';
-    if (sscanf(freq_str, "%u", &ft->freq[ft_index]) != 1) {
-      perror("Failed to parse frequency value from string.");
-      free_freq_t(ft);
-      free(freq_str);
-      return NULL;
-    }
-    x = y - x + 2; // here str[x] would point to the last '\n' of the separator
-                   // sequence. bytes(\n 25 \n)
-    assert(str[x] == '\n');
-    ft_index++;
+FrequencyTable *get_freq_table(const char *data, size_t len) {
+  if ((!data && len > 0) || (uint64_t)len > UINT32_MAX) {
+    set_error("input is too large (limit is 4 GiB)");
+    return NULL;
   }
 
+  uint32_t counts[MAX_SYMBOLS] = {0};
+  const unsigned char *p = (const unsigned char *)data;
+  for (size_t i = 0; i < len; i++)
+    counts[p[i]]++;
+
+  size_t distinct = 0;
+  for (size_t c = 0; c < MAX_SYMBOLS; c++)
+    if (counts[c] > 0)
+      distinct++;
+
+  FrequencyTable *ft = calloc(1, sizeof(FrequencyTable));
+  if (!ft) {
+    set_error("out of memory");
+    return NULL;
+  }
+  size_t alloc = distinct ? distinct : 1;
+  ft->keys = malloc(alloc);
+  ft->freq = malloc(alloc * sizeof(uint32_t));
+  if (!ft->keys || !ft->freq) {
+    free_freq_t(ft);
+    set_error("out of memory");
+    return NULL;
+  }
+
+  for (size_t c = 0; c < MAX_SYMBOLS; c++) {
+    if (counts[c] > 0) {
+      ft->keys[ft->size] = (unsigned char)c;
+      ft->freq[ft->size] = counts[c];
+      ft->size++;
+    }
+  }
+
+  freq_t_merge_sort(ft);
   return ft;
 }
-
-BinaryTree *build_btree(FrequencyTable *ft) {
-  // See Bottom up algorithm for logic.
-  BinaryTree *bt = malloc(sizeof(BinaryTree));
-  if (!bt || !ft || !ft->keys)
-    return NULL;
-
-  size_t num_nodes = strlen(ft->keys);
-
-  if (num_nodes == 0) {
-    bt->root_node = NULL;
-    return bt;
-  }
-
-  // Allocate an array of Node pointers to serve as our working forest
-  Node **nodes = malloc(num_nodes * sizeof(Node *));
-  if (!nodes) {
-    free(bt);
-    return NULL;
-  }
-
-  // Initialize individual leaf nodes using the FrequencyTable data
-  for (size_t i = 0; i < num_nodes; i++) {
-    nodes[i] = malloc(sizeof(Node));
-    nodes[i]->key = ft->keys[i];
-    nodes[i]->freq = ft->freq[i];
-    nodes[i]->child_a = NULL;
-    nodes[i]->child_b = NULL;
-  }
-
-  // Execute the bottom-up algorithm: loop until only the root node remains
-  while (num_nodes > 1) {
-    // Re-sort the active array in descending order so the lowest frequencies
-    // are at the end A simple bubble sort suffices since num_nodes is small
-    // (max 256 for characters)
-    for (size_t i = 0; i < num_nodes - 1; i++) {
-      for (size_t j = 0; j < num_nodes - i - 1; j++) {
-        if (nodes[j]->freq < nodes[j + 1]->freq) {
-          Node *temp = nodes[j];
-          nodes[j] = nodes[j + 1];
-          nodes[j + 1] = temp;
-        }
-      }
-    }
-
-    // Extract the two lowest-frequency nodes
-    Node *left = nodes[num_nodes - 1];
-    Node *right = nodes[num_nodes - 2];
-
-    // Create a new parent node and assign the sub-trees
-    Node *parent = malloc(sizeof(Node));
-    parent->freq = left->freq + right->freq;
-    parent->key = '\0'; // Internal node marker
-    parent->child_a = left;
-    parent->child_b = right;
-
-    // Replace the right slot with the new parent and shrink the active pool
-    nodes[num_nodes - 2] = parent;
-    num_nodes--;
-  }
-
-  bt->root_node = nodes[0];
-  free(nodes);
-
-  return bt;
-}
-
-bool endsWith(const char *str, const char *suffix) {
-  if (!str || !suffix)
-    return false;
-
-  size_t lenstr = strlen(str);
-  size_t lensuffix = strlen(suffix);
-
-  if (lensuffix > lenstr)
-    return false;
-
-  return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
-}
-
-TextObject *init_text_obj(char *filepath) {
-  // INFO: TrueHuffer's deflated files will have the file type: <.thman>.
-  // Moreover, TrueHuffer deflated files start with a header, between the ASCII
-  // chars for header_start and file_start See: www.ascii-code.com
-  // Example:
-  // 1 (header_start char) 127... (HEADER) 2 (file_start char)
-  // ---
-  // Header composition:
-  // first header char will always be N°127.
-  // Nothing else for now.
-  assert(filepath);
-  TextObject *to = malloc(sizeof(TextObject));
-  char *buf;
-
-  // Reading file //
-  FILE *fptr = fopen(filepath, "rb");
-  if (!fptr) {
-    perror("Error: file not found.");
-    return NULL;
-  }
-
-  // Get file size
-  fseek(fptr, 0, SEEK_END);     // moving cursor to EOF.
-  long file_size = ftell(fptr); // getting byte amount.
-  fseek(fptr, 0, SEEK_SET);     // moving back to top.
-
-  buf = (char *)malloc(file_size + 1);
-  if (!buf) {
-    fclose(fptr);
-    return NULL;
-  }
-
-  size_t bytes_read = fread(buf, 1, file_size, fptr);
-  buf[bytes_read] = '\0';
-  fclose(fptr);
-  // End of file reading //
-
-  // Is file inflated or deflated ?
-
-  if (endsWith(filepath, ".thman"))
-    to->deflatedContent = buf;
-  else
-    to->inflatedContent = buf;
-
-  return to;
-}
-
-int deflate(TextObject *to) {
-  if (to->inflatedContent == NULL)
-    return EXIT_FAILURE;
-
-  FrequencyTable *ft = get_freq_table(to->inflatedContent);
-  if (!ft)
-    return EXIT_FAILURE;
-
-  to->deflatedContent = freq_table_to_bytes(ft);
-  free_freq_t(ft);
-  free(to->inflatedContent);
-  to->inflatedContent = NULL;
-
-  return EXIT_SUCCESS;
-}
-
-int inflate(TextObject *to) {
-  if (to->deflatedContent == NULL)
-    return EXIT_FAILURE;
-
-  FrequencyTable *ft = parse_freq_table(to->deflatedContent);
-  if (!ft)
-    return EXIT_FAILURE;
-  to->inflatedContent = freq_table_to_bytes(ft);
-  free_freq_t(ft);
-  free(to->deflatedContent);
-  to->deflatedContent = NULL;
-
-  return EXIT_SUCCESS;
-}
-
-// int writeTextObjToFile(TextObject *to, const char *filepath) {
-//   if (to->deflatedContent == NULL && to->inflatedContent == NULL)
-//     return EXIT_FAILURE;
-//   const char HEAD[3] = {1, 127, 2};
-//   FILE *fp;
-//   fp = fopen(filepath, "wb");
-//   if (!fp) {
-//     perror("Failed to open file in wb mode.");
-//     return EXIT_FAILURE;
-//   }
-//   if (to->deflatedContent == NULL) {
-//     // inflatedContent write.
-//   } else if (to->inflatedContent == NULL) {
-//     // deflatedContent write.
-//     size_t len = strlen(to->deflatedContent);
-//     fwrite(HEAD, sizeof(char), 3, fp);
-//     size_t written = fwrite(to->deflatedContent, sizeof(char), len, fp);
-//   } else
-//     return EXIT_FAILURE; // Both contents are not null.
-//   return EXIT_SUCCESS;
-// }
-
-bool isFileDeflated(char *buf) {
-  return buf[0] == 1 && buf[1] == 127 && buf[2] == 2;
-}
-
-// free functions:
 
 void free_freq_t(FrequencyTable *ft) {
   if (!ft)
@@ -410,22 +179,15 @@ void free_freq_t(FrequencyTable *ft) {
   free(ft);
 }
 
-void free_text_obj(TextObject *to) {
-  if (!to)
-    return;
-  free(to->inflatedContent);
-  free(to->deflatedContent);
-  free(to);
-}
+/////////////////
+// Binary tree //
+/////////////////
 
 static void free_node_recursive(Node *n) {
   if (!n)
     return;
-  if (n->child_a)
-    free_node_recursive(n->child_a);
-  if (n->child_b)
-    free_node_recursive(n->child_b);
-
+  free_node_recursive(n->child_a);
+  free_node_recursive(n->child_b);
   free(n);
 }
 
@@ -435,4 +197,537 @@ void free_btree(BinaryTree *bt) {
 
   free_node_recursive(bt->root_node);
   free(bt);
+}
+
+static Node *new_node(unsigned char key, uint64_t freq, Node *a, Node *b) {
+  Node *n = malloc(sizeof(Node));
+  if (!n)
+    return NULL;
+  n->key = key;
+  n->freq = freq;
+  n->child_a = a;
+  n->child_b = b;
+  return n;
+}
+
+static bool is_leaf(const Node *n) {
+  return n->child_a == NULL && n->child_b == NULL;
+}
+
+BinaryTree *build_btree(FrequencyTable *ft) {
+  // See Bottom up algorithm for logic.
+  if (!ft || (ft->size > 0 && (!ft->keys || !ft->freq))) {
+    set_error("invalid frequency table");
+    return NULL;
+  }
+
+  BinaryTree *bt = calloc(1, sizeof(BinaryTree));
+  if (!bt) {
+    set_error("out of memory");
+    return NULL;
+  }
+
+  size_t num_nodes = ft->size;
+
+  if (num_nodes == 0) {
+    bt->root_node = NULL;
+    return bt;
+  }
+
+  // Working forest: array of Node pointers (NULL until created).
+  Node **nodes = calloc(num_nodes, sizeof(Node *));
+  if (!nodes) {
+    free(bt);
+    set_error("out of memory");
+    return NULL;
+  }
+
+  // Initialize individual leaf nodes using the FrequencyTable data
+  for (size_t i = 0; i < num_nodes; i++) {
+    nodes[i] = new_node(ft->keys[i], ft->freq[i], NULL, NULL);
+    if (!nodes[i])
+      goto fail;
+  }
+
+  // Sort the pool in descending order (stable insertion sort, 256 entries at
+  // most) so the lowest frequencies are at the end.
+  for (size_t i = 1; i < num_nodes; i++) {
+    Node *cur = nodes[i];
+    size_t j = i;
+    while (j > 0 && nodes[j - 1]->freq < cur->freq) {
+      nodes[j] = nodes[j - 1];
+      j--;
+    }
+    nodes[j] = cur;
+  }
+
+  // Execute the bottom-up algorithm: loop until only the root node remains
+  while (num_nodes > 1) {
+    // Extract the two lowest-frequency nodes
+    Node *left = nodes[num_nodes - 1];
+    Node *right = nodes[num_nodes - 2];
+
+    // Create a new parent node and assign the sub-trees
+    // (key 0 is just a placeholder: internal nodes are the ones with children)
+    Node *parent = new_node(0, left->freq + right->freq, left, right);
+    if (!parent)
+      goto fail;
+
+    // Remove both children from the pool and insert the parent so that the
+    // pool stays sorted in descending order.
+    num_nodes -= 2;
+    size_t pos = num_nodes;
+    while (pos > 0 && nodes[pos - 1]->freq < parent->freq) {
+      nodes[pos] = nodes[pos - 1];
+      pos--;
+    }
+    nodes[pos] = parent;
+    num_nodes++;
+  }
+
+  bt->root_node = nodes[0];
+  free(nodes);
+
+  return bt;
+
+fail:
+  for (size_t i = 0; i < num_nodes; i++)
+    free_node_recursive(nodes[i]);
+  free(nodes);
+  free(bt);
+  set_error("out of memory");
+  return NULL;
+}
+
+///////////
+// Codes //
+///////////
+
+typedef struct HuffCode {
+  uint64_t bits;
+  unsigned len;
+} HuffCode;
+
+// Walks the tree and stores the code (path from the root, child_a = 0,
+// child_b = 1) of every leaf. Returns false if a code would not fit.
+static bool fill_codes(const Node *n, uint64_t bits, unsigned depth,
+                       HuffCode *codes) {
+  if (is_leaf(n)) {
+    codes[n->key].bits = bits;
+    // A tree made of a single leaf still needs 1 bit per symbol.
+    codes[n->key].len = depth ? depth : 1;
+    return true;
+  }
+  if (depth >= MAX_CODE_LEN)
+    return false;
+  return fill_codes(n->child_a, bits << 1, depth + 1, codes) &&
+         fill_codes(n->child_b, (bits << 1) | 1u, depth + 1, codes);
+}
+
+static void put_code(unsigned char *payload, uint64_t *bitpos, HuffCode c) {
+  for (unsigned i = c.len; i-- > 0;) {
+    if ((c.bits >> i) & 1u)
+      payload[*bitpos >> 3] |= (unsigned char)(0x80u >> (*bitpos & 7u));
+    (*bitpos)++;
+  }
+}
+
+/////////////////////////
+// deflate and inflate //
+/////////////////////////
+
+int deflate(TextObject *to) {
+  if (!to || !to->inflatedContent) {
+    set_error("nothing to deflate: no inflated content loaded");
+    return EXIT_FAILURE;
+  }
+
+  int rc = EXIT_FAILURE;
+  FrequencyTable *ft = NULL;
+  BinaryTree *bt = NULL;
+  unsigned char *out = NULL;
+  HuffCode codes[MAX_SYMBOLS];
+  memset(codes, 0, sizeof(codes));
+
+  uint64_t total_bits = 0;
+  uint64_t out_len64 = 0;
+  size_t out_len = 0;
+  size_t header_len = 0;
+  uint64_t bitpos = 0;
+  unsigned char *payload = NULL;
+  const unsigned char *src = (const unsigned char *)to->inflatedContent;
+
+  ft = get_freq_table(to->inflatedContent, to->inflatedSize);
+  if (!ft)
+    goto done;
+
+  bt = build_btree(ft);
+  if (!bt)
+    goto done;
+
+  if (bt->root_node && !fill_codes(bt->root_node, 0, 0, codes)) {
+    set_error("internal error: Huffman code longer than %d bits", MAX_CODE_LEN);
+    goto done;
+  }
+
+  // Compute the output size.
+  for (size_t i = 0; i < ft->size; i++)
+    total_bits += (uint64_t)ft->freq[i] * codes[ft->keys[i]].len;
+
+  header_len =
+      HEADER_MAGIC_LEN + HEADER_COUNT_LEN + ft->size * HEADER_ENTRY_LEN;
+  out_len64 = (uint64_t)header_len + (total_bits + 7) / 8;
+  out_len = (size_t)out_len64;
+  if ((uint64_t)out_len != out_len64) {
+    set_error("input is too large for this platform");
+    goto done;
+  }
+
+  out = calloc(out_len + 1, 1); // zeroed: bits are OR-ed in. +1 for the '\0'.
+  if (!out) {
+    set_error("out of memory");
+    goto done;
+  }
+
+  // Header: magic, number of symbols, (key, frequency) table.
+  memcpy(out, HEADER_MAGIC, HEADER_MAGIC_LEN);
+  out[3] = (unsigned char)(ft->size & 0xFFu);
+  out[4] = (unsigned char)((ft->size >> 8) & 0xFFu);
+  for (size_t i = 0; i < ft->size; i++) {
+    unsigned char *entry =
+        out + HEADER_MAGIC_LEN + HEADER_COUNT_LEN + i * HEADER_ENTRY_LEN;
+    entry[0] = ft->keys[i];
+    put_u32_le(entry + 1, ft->freq[i]);
+  }
+
+  // Bit stream.
+  payload = out + header_len;
+  for (size_t i = 0; i < to->inflatedSize; i++)
+    put_code(payload, &bitpos, codes[src[i]]);
+
+  // Swap contents.
+  free(to->deflatedContent);
+  to->deflatedContent = (char *)out;
+  to->deflatedSize = out_len;
+  out = NULL;
+  free(to->inflatedContent);
+  to->inflatedContent = NULL;
+  to->inflatedSize = 0;
+  rc = EXIT_SUCCESS;
+
+done:
+  free(out);
+  free_btree(bt);
+  free_freq_t(ft);
+  return rc;
+}
+
+int inflate(TextObject *to) {
+  if (!to || !to->deflatedContent) {
+    set_error("nothing to inflate: no deflated content loaded");
+    return EXIT_FAILURE;
+  }
+
+  const unsigned char *in = (const unsigned char *)to->deflatedContent;
+  size_t len = to->deflatedSize;
+
+  if (!isFileDeflated(to->deflatedContent, len)) {
+    set_error("not a TrueHuffer file (header not found)");
+    return EXIT_FAILURE;
+  }
+  if (len < HEADER_MAGIC_LEN + HEADER_COUNT_LEN) {
+    set_error("corrupted file: truncated header");
+    return EXIT_FAILURE;
+  }
+
+  int rc = EXIT_FAILURE;
+  FrequencyTable *ft = NULL;
+  BinaryTree *bt = NULL;
+  unsigned char *out = NULL;
+  bool seen[MAX_SYMBOLS] = {false};
+  uint64_t total = 0;
+
+  size_t count = (size_t)in[3] | ((size_t)in[4] << 8);
+  if (count > MAX_SYMBOLS) {
+    set_error("corrupted file: invalid symbol count");
+    return EXIT_FAILURE;
+  }
+  size_t header_len =
+      HEADER_MAGIC_LEN + HEADER_COUNT_LEN + count * HEADER_ENTRY_LEN;
+  if (len < header_len) {
+    set_error("corrupted file: truncated frequency table");
+    return EXIT_FAILURE;
+  }
+
+  // Rebuild the frequency table, in the very same order it was written.
+  ft = calloc(1, sizeof(FrequencyTable));
+  if (!ft) {
+    set_error("out of memory");
+    return EXIT_FAILURE;
+  }
+  size_t alloc = count ? count : 1;
+  ft->keys = malloc(alloc);
+  ft->freq = malloc(alloc * sizeof(uint32_t));
+  if (!ft->keys || !ft->freq) {
+    set_error("out of memory");
+    goto done;
+  }
+
+  for (size_t i = 0; i < count; i++) {
+    const unsigned char *entry =
+        in + HEADER_MAGIC_LEN + HEADER_COUNT_LEN + i * HEADER_ENTRY_LEN;
+    uint32_t freq = get_u32_le(entry + 1);
+    if (seen[entry[0]] || freq == 0) {
+      set_error("corrupted file: invalid frequency table");
+      goto done;
+    }
+    seen[entry[0]] = true;
+    ft->keys[i] = entry[0];
+    ft->freq[i] = freq;
+    ft->size++;
+    total += freq;
+  }
+
+  // Every symbol costs at least one bit: reject absurd sizes before
+  // allocating anything.
+  const unsigned char *payload = in + header_len;
+  uint64_t payload_bits = (uint64_t)(len - header_len) * 8;
+  if (total > UINT32_MAX || total > payload_bits) {
+    set_error("corrupted file: data is shorter than its header announces");
+    goto done;
+  }
+
+  bt = build_btree(ft);
+  if (!bt)
+    goto done;
+
+  size_t out_len = (size_t)total;
+  out = malloc(out_len + 1);
+  if (!out) {
+    set_error("out of memory");
+    goto done;
+  }
+
+  // Decode: walk the tree bit by bit.
+  const Node *root = bt->root_node;
+  uint64_t bitpos = 0;
+  for (size_t i = 0; i < out_len; i++) {
+    const Node *n = root;
+    if (is_leaf(n)) {
+      bitpos++; // single symbol file: 1 bit per symbol, value irrelevant.
+    } else {
+      while (!is_leaf(n)) {
+        if (bitpos >= payload_bits) {
+          set_error("corrupted file: unexpected end of data");
+          goto done;
+        }
+        unsigned bit =
+            (payload[bitpos >> 3] >> (7u - (unsigned)(bitpos & 7u))) & 1u;
+        bitpos++;
+        n = bit ? n->child_b : n->child_a;
+      }
+    }
+    out[i] = n->key;
+  }
+  out[out_len] = '\0';
+
+  // Swap contents.
+  free(to->inflatedContent);
+  to->inflatedContent = (char *)out;
+  to->inflatedSize = out_len;
+  out = NULL;
+  free(to->deflatedContent);
+  to->deflatedContent = NULL;
+  to->deflatedSize = 0;
+  rc = EXIT_SUCCESS;
+
+done:
+  free(out);
+  free_btree(bt);
+  free_freq_t(ft);
+  return rc;
+}
+
+////////////////
+// File input //
+////////////////
+
+bool isFileDeflated(const char *buf, size_t len) {
+  return buf && len >= HEADER_MAGIC_LEN &&
+         memcmp(buf, HEADER_MAGIC, HEADER_MAGIC_LEN) == 0;
+}
+
+// Reads a whole file into a freshly allocated, NUL terminated buffer.
+static char *read_whole_file(const char *filepath, size_t *out_size) {
+  FILE *fptr = fopen(filepath, "rb");
+  if (!fptr) {
+    set_error("cannot open '%s': %s", filepath, strerror(errno));
+    return NULL;
+  }
+
+  size_t cap = 65536;
+  size_t len = 0;
+  char *buf = malloc(cap);
+  if (!buf) {
+    fclose(fptr);
+    set_error("out of memory");
+    return NULL;
+  }
+
+  for (;;) {
+    if (len == cap) {
+      if (cap > SIZE_MAX / 2) {
+        free(buf);
+        fclose(fptr);
+        set_error("'%s' is too large", filepath);
+        return NULL;
+      }
+      char *tmp = realloc(buf, cap * 2);
+      if (!tmp) {
+        free(buf);
+        fclose(fptr);
+        set_error("out of memory");
+        return NULL;
+      }
+      buf = tmp;
+      cap *= 2;
+    }
+    size_t n = fread(buf + len, 1, cap - len, fptr);
+    len += n;
+    if (n == 0)
+      break;
+  }
+
+  if (ferror(fptr)) {
+    set_error("cannot read '%s'", filepath);
+    free(buf);
+    fclose(fptr);
+    return NULL;
+  }
+  fclose(fptr);
+
+  if (len == cap) { // room for the terminator
+    char *tmp = realloc(buf, cap + 1);
+    if (!tmp) {
+      free(buf);
+      set_error("out of memory");
+      return NULL;
+    }
+    buf = tmp;
+  }
+  buf[len] = '\0';
+  *out_size = len;
+  return buf;
+}
+
+TextObject *init_text_obj(const char *filepath) {
+  // INFO: TrueHuffer's deflated files will have the file type: <.thman>.
+  // Moreover, TrueHuffer deflated files start with a header, see compress.h
+  // for the exact layout. A file is considered deflated when it starts with
+  // the magic bytes 1, 127, 2 (that is what isFileDeflated() checks).
+  if (!filepath) {
+    set_error("no file path given");
+    return NULL;
+  }
+
+  size_t size = 0;
+  char *buf = read_whole_file(filepath, &size);
+  if (!buf)
+    return NULL;
+
+  TextObject *to = calloc(1, sizeof(TextObject));
+  if (!to) {
+    free(buf);
+    set_error("out of memory");
+    return NULL;
+  }
+
+  if (isFileDeflated(buf, size)) {
+    to->deflatedContent = buf;
+    to->deflatedSize = size;
+  } else {
+    to->inflatedContent = buf;
+    to->inflatedSize = size;
+  }
+
+  return to;
+}
+
+/////////////////
+// File output //
+/////////////////
+
+int writeTextObjToFile(const TextObject *to, const char *filepath) {
+  if (!to || !filepath) {
+    set_error("invalid arguments");
+    return EXIT_FAILURE;
+  }
+
+  const char *data;
+  size_t size;
+  if (to->deflatedContent && !to->inflatedContent) {
+    data = to->deflatedContent;
+    size = to->deflatedSize;
+  } else if (to->inflatedContent && !to->deflatedContent) {
+    data = to->inflatedContent;
+    size = to->inflatedSize;
+  } else {
+    set_error("nothing to write (or both contents are set)");
+    return EXIT_FAILURE;
+  }
+
+  FILE *fp = fopen(filepath, "wb");
+  if (!fp) {
+    set_error("cannot create '%s': %s", filepath, strerror(errno));
+    return EXIT_FAILURE;
+  }
+
+  size_t written = size ? fwrite(data, 1, size, fp) : 0;
+  if (written != size) {
+    set_error("failed to write '%s': %s", filepath, strerror(errno));
+    fclose(fp);
+    return EXIT_FAILURE;
+  }
+  if (fclose(fp) != 0) {
+    set_error("failed to write '%s': %s", filepath, strerror(errno));
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
+}
+
+char *make_output_path(const char *input, bool deflating) {
+  if (!input)
+    return NULL;
+
+  size_t len = strlen(input);
+  size_t ext_len = strlen(THMAN_EXTENSION);
+  const char *suffix = "";
+  size_t keep = len;
+
+  if (deflating) {
+    suffix = THMAN_EXTENSION;
+  } else if (len > ext_len && endsWith(input, THMAN_EXTENSION)) {
+    keep = len - ext_len;
+  } else {
+    suffix = ".out";
+  }
+
+  size_t suffix_len = strlen(suffix);
+  char *path = malloc(keep + suffix_len + 1);
+  if (!path)
+    return NULL;
+  memcpy(path, input, keep);
+  memcpy(path + keep, suffix, suffix_len + 1);
+  return path;
+}
+
+// free functions:
+
+void free_text_obj(TextObject *to) {
+  if (!to)
+    return;
+  free(to->inflatedContent);
+  free(to->deflatedContent);
+  free(to);
 }
