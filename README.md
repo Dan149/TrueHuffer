@@ -8,6 +8,16 @@ TrueHuffer, programme de compression de fichiers basé sur la méthode Huffman.
 Nous avons décidé de commenter le code en anglais durant le développement. Si cela change pour la version finale, ne soyez pas étonnée de trouver des explications en anglais dans les commits précédents de ma part pour Yanis et inversement.
 De la même manière, le nom des variables & fonctions est en anglais.
 
+## Ce que l'IA a fait:
+v (Note de Daniel) v
+J'ai pris la liberté d'utiliser l'IA pour les usages suivants:
+- Conseils sur la façon de stocker les données d'un fichier.
+- Création du Makefile.
+- Création de tests robustes et déterministes.
+- Conception de l'UI dans le terminal.
+
+Ces modifications ont étés apportés lors de mon dernier commit, qui comprend aussi la majorité de mon travail sur l'optimisation de la génération de l'arbre binaire et son stockage efficace dans un fichier.
+
 ___
 
 ## Documentation du Makefile

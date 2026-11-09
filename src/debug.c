@@ -1,14 +1,22 @@
 #include "debug.h"
 #include "compress.h"
-#include <assert.h>
+#include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>
-#include <string.h>
 
 void print_freq_table(FrequencyTable *ft) {
-  assert(ft != NULL && ft->keys != NULL && ft->freq != NULL);
-  for (long unsigned int i = 0; i < strlen(ft->keys); i++) {
-    printf("\nchar: %c | frequency: %d", ft->keys[i], ft->freq[i]);
+  if (ft == NULL || (ft->size > 0 && (ft->keys == NULL || ft->freq == NULL))) {
+    printf("FrequencyTable pointer is NULL or invalid.\n");
+    return;
   }
+  for (size_t i = 0; i < ft->size; i++) {
+    if (isprint(ft->keys[i]))
+      printf("\nchar: %c | frequency: %" PRIu32, ft->keys[i], ft->freq[i]);
+    else
+      printf("\nchar: 0x%02X | frequency: %" PRIu32, (unsigned)ft->keys[i],
+             ft->freq[i]);
+  }
+  printf("\n");
 }
 
 void print_node(Node *n, int level) {
@@ -23,14 +31,16 @@ void print_node(Node *n, int level) {
   }
 
   // Print the node data
-  // Internal nodes have a '\0' key. Handle newline characters cleanly for
-  // debugging.
-  if (n->key == '\0') {
-    printf("[00:%u]\n", n->freq);
+  // Internal nodes are the ones with children. Handle non printable
+  // characters cleanly for debugging.
+  if (n->child_a != NULL || n->child_b != NULL) {
+    printf("[00:%" PRIu64 "]\n", n->freq);
   } else if (n->key == '\n') {
-    printf("['\\n':%u]\n", n->freq);
+    printf("['\\n':%" PRIu64 "]\n", n->freq);
+  } else if (isprint(n->key)) {
+    printf("['%c':%" PRIu64 "]\n", n->key, n->freq);
   } else {
-    printf("['%c':%u]\n", n->key, n->freq);
+    printf("[0x%02X:%" PRIu64 "]\n", (unsigned)n->key, n->freq);
   }
 
   // Traverse the left child (child_a)
